@@ -33,7 +33,8 @@ import {
   LayoutDashboard,
   X,
   ShieldCheck,
-  Wallet
+  Wallet,
+  Check
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { GoogleGenAI } from "@google/genai";
@@ -141,6 +142,92 @@ const ProductDetail = ({ product, onClose, onAdd, generatedImage }: { product: P
         >
           AJOUTER AU PANIER
           <ShoppingCart className="w-5 h-5" />
+        </motion.button>
+      </div>
+    </motion.div>
+  );
+};
+
+const KitDetail = ({ kit, onClose, onAdd, generatedImages }: { kit: SurgeryKit; onClose: () => void; onAdd: (kit: SurgeryKit, selectedProductIds: string[]) => void; generatedImages: Record<string, string> }) => {
+  const [selectedIds, setSelectedIds] = useState<string[]>(kit.products);
+
+  const toggleProduct = (id: string) => {
+    setSelectedIds(prev => 
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    );
+  };
+
+  const kitProducts = kit.products.map(id => PRODUCTS.find(p => p.id === id)).filter(Boolean) as Product[];
+  const totalPrice = kitProducts.filter(p => selectedIds.includes(p.id)).reduce((acc, p) => acc + p.price, 0);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 100 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: 100 }}
+      className="fixed inset-0 z-[60] bg-white flex flex-col"
+    >
+      <div className="relative h-[30vh] bg-blue-600 p-8 flex flex-col justify-end">
+        <button 
+          onClick={onClose}
+          className="absolute top-4 left-4 p-2 bg-white/20 backdrop-blur-sm rounded-full shadow-lg text-white"
+        >
+          <ArrowLeft className="w-6 h-6" />
+        </button>
+        <div className="space-y-2">
+          <div className="bg-white/20 w-fit px-2 py-1 rounded-lg text-[10px] font-bold text-white uppercase tracking-wider">Pack Optimisé par IA</div>
+          <h2 className="text-3xl font-black text-white leading-tight">{kit.name}</h2>
+          <p className="text-blue-100 text-sm font-medium">{kit.description}</p>
+        </div>
+      </div>
+
+      <div className="flex-1 p-6 space-y-6 overflow-y-auto">
+        <div className="flex justify-between items-center">
+          <h3 className="font-bold text-gray-900">Contenu du Pack</h3>
+          <span className="text-xs text-gray-500 font-medium">{selectedIds.length} / {kit.products.length} sélectionnés</span>
+        </div>
+
+        <div className="space-y-3">
+          {kitProducts.map(product => (
+            <div 
+              key={product.id}
+              onClick={() => toggleProduct(product.id)}
+              className={`p-3 rounded-2xl border transition-all flex items-center gap-4 cursor-pointer ${selectedIds.includes(product.id) ? 'bg-blue-50 border-blue-200' : 'bg-white border-gray-100 opacity-60'}`}
+            >
+              <div className="w-12 h-12 rounded-xl overflow-hidden bg-gray-50 flex-shrink-0">
+                <ProductImage src={generatedImages[product.id]} alt={product.name} className="w-full h-full object-contain" />
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-bold text-gray-900">{product.name}</p>
+                <p className="text-[10px] text-gray-500 font-medium">{product.manufacturer}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-sm font-black text-gray-900">{product.price.toFixed(2)} MAD</p>
+                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${selectedIds.includes(product.id) ? 'bg-blue-600 border-blue-600' : 'border-gray-200'}`}>
+                  {selectedIds.includes(product.id) && <Check className="w-3 h-3 text-white" />}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="p-4 border-t border-gray-100 space-y-4 bg-gray-50">
+        <div className="flex justify-between items-center px-2">
+          <span className="text-gray-500 font-medium text-sm">Total du Pack Modifié</span>
+          <span className="text-2xl font-black text-gray-900">{totalPrice.toFixed(2)} MAD</span>
+        </div>
+        <motion.button
+          whileTap={{ scale: 0.98 }}
+          disabled={selectedIds.length === 0}
+          onClick={() => {
+            onAdd(kit, selectedIds);
+            onClose();
+          }}
+          className={`w-full py-4 rounded-2xl font-bold text-lg shadow-xl flex items-center justify-center gap-3 transition-all ${selectedIds.length === 0 ? 'bg-gray-300 text-gray-500 cursor-not-allowed shadow-none' : 'bg-blue-600 text-white shadow-blue-200'}`}
+        >
+          AJOUTER LE PACK AU PANIER
+          <Package className="w-5 h-5" />
         </motion.button>
       </div>
     </motion.div>
@@ -509,6 +596,7 @@ export default function App() {
   const [isAuthReady, setIsAuthReady] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [selectedKit, setSelectedKit] = useState<SurgeryKit | null>(null);
   const [cart, setCart] = useState<{ product: Product; quantity: number }[]>([]);
   const [activeOrder, setActiveOrder] = useState<Order | null>(null);
   const [pastOrders, setPastOrders] = useState<Order[]>([]);
@@ -665,8 +753,9 @@ export default function App() {
     });
   };
 
-  const addKitToCart = (kit: SurgeryKit) => {
-    kit.products.forEach(productId => {
+  const addKitToCart = (kit: SurgeryKit, selectedProductIds?: string[]) => {
+    const idsToUse = selectedProductIds || kit.products;
+    idsToUse.forEach(productId => {
       const product = PRODUCTS.find(p => p.id === productId);
       if (product) {
         addToCart(product);
@@ -681,6 +770,7 @@ export default function App() {
   const cartTotal = cart.reduce((acc, item) => acc + item.product.price * item.quantity, 0);
   const cartReimbursed = cart.reduce((acc, item) => acc + (item.product.isReimbursed ? item.product.price * item.quantity : 0), 0);
   const cartPatient = cartTotal - cartReimbursed;
+  const pastOrdersTotal = pastOrders.reduce((acc, order) => acc + (order.totalPrice || 0), 0);
 
   const handleLogin = async () => {
     try {
@@ -977,7 +1067,8 @@ export default function App() {
                       <motion.div
                         key={kit.id}
                         whileTap={{ scale: 0.98 }}
-                        className="min-w-[240px] bg-blue-600 rounded-2xl p-4 text-white shadow-lg shadow-blue-200 relative overflow-hidden group"
+                        onClick={() => setSelectedKit(kit)}
+                        className="min-w-[240px] bg-blue-600 rounded-2xl p-4 text-white shadow-lg shadow-blue-200 relative overflow-hidden group cursor-pointer"
                       >
                         <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16 blur-2xl group-hover:bg-white/20 transition-all" />
                         <div className="relative z-10 space-y-3">
@@ -986,6 +1077,22 @@ export default function App() {
                             <div className="bg-white/20 px-2 py-1 rounded-lg text-[10px] font-bold">PACK IA</div>
                           </div>
                           <p className="text-[10px] opacity-80 line-clamp-2">{kit.description}</p>
+                          <div className="space-y-1">
+                            <p className="text-[8px] font-bold opacity-60 uppercase tracking-tighter">Contenu du pack:</p>
+                            <div className="flex flex-wrap gap-1">
+                              {kit.products.slice(0, 3).map(id => {
+                                const p = PRODUCTS.find(prod => prod.id === id);
+                                return p ? (
+                                  <span key={id} className="text-[8px] bg-white/10 px-1 py-0.5 rounded border border-white/10 whitespace-nowrap">
+                                    {p.name}
+                                  </span>
+                                ) : null;
+                              })}
+                              {kit.products.length > 3 && (
+                                <span className="text-[8px] opacity-60">+{kit.products.length - 3} autres</span>
+                              )}
+                            </div>
+                          </div>
                           <div className="flex justify-between items-end pt-2">
                             <div>
                               <p className="text-[10px] opacity-60 uppercase font-bold tracking-wider">Prix du pack</p>
@@ -993,10 +1100,13 @@ export default function App() {
                             </div>
                             <motion.button
                               whileTap={{ scale: 0.9 }}
-                              onClick={() => addKitToCart(kit)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedKit(kit);
+                              }}
                               className="bg-white text-blue-600 px-3 py-2 rounded-xl text-[10px] font-bold shadow-sm"
                             >
-                              COMMANDER PACK
+                              DÉTAILLER / MODIFIER
                             </motion.button>
                           </div>
                         </div>
@@ -1042,6 +1152,18 @@ export default function App() {
               generatedImage={generatedImages[selectedProduct.id]}
               onClose={() => setSelectedProduct(null)} 
               onAdd={addToCart} 
+            />
+          )}
+        </AnimatePresence>
+
+        {/* --- KIT DETAIL OVERLAY --- */}
+        <AnimatePresence>
+          {selectedKit && (
+            <KitDetail 
+              kit={selectedKit} 
+              generatedImages={generatedImages}
+              onClose={() => setSelectedKit(null)} 
+              onAdd={addKitToCart} 
             />
           )}
         </AnimatePresence>
@@ -1113,6 +1235,14 @@ export default function App() {
                           <p className="text-[10px] text-gray-500">Compensation Patient</p>
                         </div>
                         <span className="text-lg font-black text-gray-800">{cartPatient.toFixed(2)} MAD</span>
+                      </div>
+
+                      <div className="flex justify-between items-center p-3 bg-blue-600 rounded-xl shadow-lg shadow-blue-100">
+                        <div>
+                          <p className="text-xs font-bold text-white uppercase">Total TTC</p>
+                          <p className="text-[10px] text-blue-100">Montant global de la commande</p>
+                        </div>
+                        <span className="text-xl font-black text-white">{cartTotal.toFixed(2)} MAD</span>
                       </div>
                     </div>
                   </div>
@@ -1223,7 +1353,13 @@ export default function App() {
                   <h2 className="text-2xl font-black text-gray-900">
                     {activeOrder.deliveryType === 'scheduled' ? `Livraison prévue à ${activeOrder.deliverySlot}` : `Arrivée dans ${activeOrder.eta} min`}
                   </h2>
-                  <p className="text-gray-500 text-sm">Commande #{activeOrder.id} • {activeOrder.deliveryType === 'express' ? 'Express' : activeOrder.deliveryType === 'night' ? 'Nuit' : 'Programmé'}</p>
+                  <div className="flex justify-between items-end">
+                    <p className="text-gray-500 text-sm">Commande #{activeOrder.id} • {activeOrder.deliveryType === 'express' ? 'Express' : activeOrder.deliveryType === 'night' ? 'Nuit' : 'Programmé'}</p>
+                    <div className="text-right">
+                      <p className="text-[10px] text-gray-400 uppercase font-bold">Total Payé</p>
+                      <p className="text-lg font-black text-blue-600">{activeOrder.totalPrice.toFixed(2)} MAD</p>
+                    </div>
+                  </div>
                 </div>
                 <div className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1">
                   <div className="w-1.5 h-1.5 bg-green-700 rounded-full animate-pulse" />
@@ -1311,6 +1447,11 @@ export default function App() {
               <section className="space-y-3">
                 <h2 className="text-lg font-bold">Tableau de Bord Financier</h2>
                 <div className="grid grid-cols-2 gap-3">
+                  <div className="bg-blue-600 p-4 rounded-2xl shadow-lg shadow-blue-100 col-span-2">
+                    <p className="text-[10px] font-bold text-blue-100 uppercase mb-1">Chiffre d'Affaires Total</p>
+                    <p className="text-2xl font-black text-white">15,570 MAD</p>
+                    <p className="text-[10px] text-blue-200 mt-1 font-medium">Cumul des dossiers Caisse & Patient</p>
+                  </div>
                   <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
                     <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Remboursé (Caisse)</p>
                     <p className="text-xl font-black text-blue-600">12,450 MAD</p>
@@ -1446,6 +1587,16 @@ export default function App() {
                 ))
               )}
             </div>
+
+            {pastOrders.length > 0 && (
+              <div className="p-6 bg-white border-t border-gray-100 space-y-2 mb-16 shadow-2xl">
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-500 font-bold text-sm uppercase tracking-wider">Total à payé :</span>
+                  <span className="text-2xl font-black text-blue-600">{pastOrdersTotal.toFixed(2)} MAD</span>
+                </div>
+                <p className="text-[10px] text-gray-400 text-center">Somme totale de toutes vos factures réglées</p>
+              </div>
+            )}
           </motion.div>
         )}
         {view === 'payment' && activeOrder && (
