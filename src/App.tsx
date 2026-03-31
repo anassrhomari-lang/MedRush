@@ -31,7 +31,9 @@ import {
   MessageCircle,
   Download,
   LayoutDashboard,
-  X
+  X,
+  ShieldCheck,
+  Wallet
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { GoogleGenAI } from "@google/genai";
@@ -374,10 +376,135 @@ const ProductItem = ({ product, onAdd, onClick, generatedImage }: { product: Pro
   );
 };
 
+// --- Payment Component ---
+const Payment = ({ order, onConfirm, onBack }: { order: Order; onConfirm: () => void; onBack: () => void }) => {
+  const [method, setMethod] = useState<'card' | 'apple' | 'cash'>('card');
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  const handlePay = () => {
+    setIsProcessing(true);
+    setTimeout(() => {
+      setIsProcessing(false);
+      onConfirm();
+    }, 2000);
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: 20 }}
+      className="flex flex-col h-full bg-gray-50"
+    >
+      <div className="p-4 flex items-center gap-4 bg-white border-b border-gray-100">
+        <button onClick={onBack} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
+          <ArrowLeft className="w-6 h-6 text-gray-700" />
+        </button>
+        <h1 className="text-xl font-black text-gray-900">Paiement Sécurisé</h1>
+      </div>
+
+      <div className="flex-1 overflow-y-auto p-4 space-y-6">
+        {/* Order Summary */}
+        <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
+          <h2 className="text-xs font-bold text-gray-400 uppercase mb-3">Résumé de la commande</h2>
+          <div className="space-y-2">
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-500">Total Articles</span>
+              <span className="font-bold text-gray-900">{order.totalPrice.toFixed(2)} MAD</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-500">Prise en charge (AMO/CNOPS)</span>
+              <span className="font-bold text-green-600">-{order.reimbursedAmount.toFixed(2)} MAD</span>
+            </div>
+            <div className="pt-2 border-t border-dashed border-gray-100 flex justify-between items-center">
+              <span className="font-bold text-gray-900">À payer</span>
+              <span className="text-xl font-black text-blue-600">{order.patientAmount.toFixed(2)} MAD</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Payment Methods */}
+        <div className="space-y-3">
+          <h2 className="text-xs font-bold text-gray-400 uppercase px-1">Méthode de paiement</h2>
+          
+          <button 
+            onClick={() => setMethod('card')}
+            className={`w-full p-4 rounded-2xl border-2 transition-all flex items-center gap-4 ${method === 'card' ? 'border-blue-600 bg-blue-50' : 'border-white bg-white'}`}
+          >
+            <div className={`p-2 rounded-xl ${method === 'card' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-400'}`}>
+              <CreditCard className="w-6 h-6" />
+            </div>
+            <div className="text-left">
+              <p className="font-bold text-gray-900">Carte Bancaire</p>
+              <p className="text-xs text-gray-500">Visa, Mastercard, CMI</p>
+            </div>
+            {method === 'card' && <CheckCircle2 className="w-5 h-5 text-blue-600 ml-auto" />}
+          </button>
+
+          <button 
+            onClick={() => setMethod('apple')}
+            className={`w-full p-4 rounded-2xl border-2 transition-all flex items-center gap-4 ${method === 'apple' ? 'border-blue-600 bg-blue-50' : 'border-white bg-white'}`}
+          >
+            <div className={`p-2 rounded-xl ${method === 'apple' ? 'bg-black text-white' : 'bg-gray-100 text-gray-400'}`}>
+              <Wallet className="w-6 h-6" />
+            </div>
+            <div className="text-left">
+              <p className="font-bold text-gray-900">Apple Pay / Google Pay</p>
+              <p className="text-xs text-gray-500">Paiement en un clic</p>
+            </div>
+            {method === 'apple' && <CheckCircle2 className="w-5 h-5 text-blue-600 ml-auto" />}
+          </button>
+
+          <button 
+            onClick={() => setMethod('cash')}
+            className={`w-full p-4 rounded-2xl border-2 transition-all flex items-center gap-4 ${method === 'cash' ? 'border-blue-600 bg-blue-50' : 'border-white bg-white'}`}
+          >
+            <div className={`p-2 rounded-xl ${method === 'cash' ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-400'}`}>
+              <Truck className="w-6 h-6" />
+            </div>
+            <div className="text-left">
+              <p className="font-bold text-gray-900">Paiement à la livraison</p>
+              <p className="text-xs text-gray-500">Espèces ou TPE mobile</p>
+            </div>
+            {method === 'cash' && <CheckCircle2 className="w-5 h-5 text-blue-600 ml-auto" />}
+          </button>
+        </div>
+
+        {/* Security Badge */}
+        <div className="flex items-center justify-center gap-2 text-gray-400">
+          <ShieldCheck className="w-4 h-4" />
+          <span className="text-[10px] font-medium uppercase tracking-wider">Transaction 100% sécurisée par CMI</span>
+        </div>
+      </div>
+
+      <div className="p-4 bg-white border-t border-gray-100">
+        <motion.button
+          whileTap={{ scale: 0.98 }}
+          onClick={handlePay}
+          disabled={isProcessing}
+          className="w-full bg-blue-600 text-white py-4 rounded-2xl font-bold text-lg shadow-xl shadow-blue-200 flex items-center justify-center gap-3 disabled:bg-blue-300"
+        >
+          {isProcessing ? (
+            <>
+              <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              TRAITEMENT...
+            </>
+          ) : (
+            <>
+              PAYER {order.patientAmount.toFixed(2)} MAD
+              <ChevronRight className="w-5 h-5" />
+            </>
+          )}
+        </motion.button>
+      </div>
+    </motion.div>
+  );
+};
+
 // --- Main App ---
 
 export default function App() {
-  const [view, setView] = useState<'home' | 'category' | 'cart' | 'tracking' | 'dashboard' | 'invoices' | 'profile'>('home');
+  const [view, setView] = useState<'home' | 'category' | 'cart' | 'tracking' | 'dashboard' | 'invoices' | 'profile' | 'payment'>('home');
   const [user, setUser] = useState<User | null>(null);
   const [isAuthReady, setIsAuthReady] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
@@ -404,9 +531,9 @@ export default function App() {
           if (!userDoc.exists()) {
             await setDoc(userRef, {
               uid: currentUser.uid,
-              email: currentUser.email,
-              displayName: currentUser.displayName,
-              photoURL: currentUser.photoURL,
+              email: currentUser.email || '',
+              displayName: currentUser.displayName || null,
+              photoURL: currentUser.photoURL || null,
               role: 'user',
               createdAt: serverTimestamp()
             });
@@ -591,7 +718,7 @@ export default function App() {
       reimbursedAmount: cartReimbursed,
       patientAmount: cartPatient,
       deliveryType: deliveryType,
-      deliverySlot: deliveryType === 'scheduled' ? deliverySlot : undefined,
+      deliverySlot: deliveryType === 'scheduled' ? deliverySlot : null,
       courierName: 'Ahmed K.',
       date: serverTimestamp()
     };
@@ -604,7 +731,7 @@ export default function App() {
         items: cart // Keep full product objects for UI
       } as Order);
       setCart([]);
-      setView('tracking');
+      setView('payment');
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, `users/${user.uid}/orders/${orderId}`);
     }
@@ -636,12 +763,17 @@ export default function App() {
     }
     
     // Table
-    const tableData = order.items.map(item => [
-      item.product.name,
-      item.quantity.toString(),
-      `${item.product.price.toFixed(2)} MAD`,
-      `${(item.product.price * item.quantity).toFixed(2)} MAD`
-    ]);
+    const tableData = order.items.map(item => {
+      // Handle both full product objects and simplified Firestore items
+      const name = item.product?.name || (item as any).name || 'Produit';
+      const price = item.product?.price || (item as any).price || 0;
+      return [
+        name,
+        item.quantity.toString(),
+        `${price.toFixed(2)} MAD`,
+        `${(price * item.quantity).toFixed(2)} MAD`
+      ];
+    });
     
     autoTable(doc, {
       startY: 70,
@@ -1151,6 +1283,14 @@ export default function App() {
                   </button>
                 </div>
               </div>
+
+              <button 
+                onClick={() => generateInvoicePDF(activeOrder)}
+                className="w-full py-4 bg-blue-600 text-white rounded-2xl font-bold flex items-center justify-center gap-3 shadow-lg shadow-blue-100"
+              >
+                <Download className="w-5 h-5" />
+                TÉLÉCHARGER LA FACTURE (PDF)
+              </button>
             </div>
           </motion.div>
         )}
@@ -1308,6 +1448,14 @@ export default function App() {
             </div>
           </motion.div>
         )}
+        {view === 'payment' && activeOrder && (
+          <Payment 
+            order={activeOrder} 
+            onConfirm={() => setView('tracking')} 
+            onBack={() => setView('cart')} 
+          />
+        )}
+
         {view === 'profile' && user && (
           <Profile user={user} onLogout={handleLogout} onBack={() => setView('home')} />
         )}
