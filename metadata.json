@@ -1,0 +1,7 @@
+{
+  "name": "Remix: MediRush",
+  "description": "On-demand medical supply delivery for healthcare professionals. Real-time tracking, intelligent stock management, and split billing.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}

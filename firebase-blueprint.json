@@ -1,0 +1,59 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "User Profile",
+      "description": "User information and settings.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "displayName": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "role": { "type": "string", "enum": ["user", "admin"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "role"]
+    },
+    "Order": {
+      "title": "Order",
+      "description": "A purchase order made by a user.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "uid": { "type": "string" },
+        "status": { "type": "string", "enum": ["received", "preparing", "on_way", "delivered"] },
+        "eta": { "type": "number" },
+        "totalPrice": { "type": "number" },
+        "reimbursedAmount": { "type": "number" },
+        "patientAmount": { "type": "number" },
+        "deliveryType": { "type": "string", "enum": ["express", "scheduled", "night"] },
+        "deliverySlot": { "type": "string" },
+        "courierName": { "type": "string" },
+        "date": { "type": "string", "format": "date-time" },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "productId": { "type": "string" },
+              "quantity": { "type": "number" },
+              "price": { "type": "number" },
+              "name": { "type": "string" }
+            }
+          }
+        }
+      },
+      "required": ["id", "uid", "status", "totalPrice", "date", "items"]
+    }
+  },
+  "firestore": {
+    "/users/{uid}": {
+      "schema": "UserProfile",
+      "description": "User profile data."
+    },
+    "/users/{uid}/orders/{orderId}": {
+      "schema": "Order",
+      "description": "User's order history."
+    }
+  }
+}
