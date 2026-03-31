@@ -34,7 +34,9 @@ import {
   X,
   ShieldCheck,
   Wallet,
-  Check
+  Check,
+  Smartphone,
+  Banknote
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { GoogleGenAI } from "@google/genai";
@@ -464,22 +466,31 @@ const ProductItem = ({ product, onAdd, onClick, generatedImage }: { product: Pro
 };
 
 // --- Payment Component ---
-const Payment = ({ order, onConfirm, onBack }: { order: Order; onConfirm: () => void; onBack: () => void }) => {
+const Payment = ({ order, onConfirm, onBack }: { order: Order; onConfirm: (method: string) => void; onBack: () => void }) => {
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [selectedMethod, setSelectedMethod] = useState<string>('cash');
 
   const handlePay = () => {
     setIsProcessing(true);
     setTimeout(() => {
       setIsProcessing(false);
-      onConfirm();
+      onConfirm(selectedMethod);
     }, 2000);
   };
+
+  const paymentMethods = [
+    { id: 'cash', label: 'Espèces', icon: Banknote, color: 'text-green-600', bg: 'bg-green-50' },
+    { id: 'card', label: 'TPE Mobile', icon: CreditCard, color: 'text-blue-600', bg: 'bg-blue-50' },
+    { id: 'apple', label: 'Apple Pay', icon: Smartphone, color: 'text-black', bg: 'bg-gray-50' },
+    { id: 'google', label: 'Google Pay', icon: Smartphone, color: 'text-blue-500', bg: 'bg-blue-50' },
+    { id: 'check', label: 'Chèque', icon: FileText, color: 'text-orange-600', bg: 'bg-orange-50' },
+  ];
 
   const steps = [
     { id: 1, label: 'Récapitulatif', icon: ClipboardList },
     { id: 2, label: 'Livraison', icon: Truck },
-    { id: 3, label: 'Confirmation', icon: CheckCircle2 },
+    { id: 3, label: 'Paiement', icon: Wallet },
   ];
 
   return (
@@ -593,6 +604,15 @@ const Payment = ({ order, onConfirm, onBack }: { order: Order; onConfirm: () => 
                       </p>
                     </div>
                   </div>
+                  <div className="flex items-start gap-3 p-3 bg-gray-50 rounded-xl border border-gray-100">
+                    <Wallet className="w-5 h-5 text-green-600 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-bold text-gray-900">Mode de paiement</p>
+                      <p className="text-xs text-gray-500">
+                        {paymentMethods.find(m => m.id === selectedMethod)?.label || 'À la livraison'}
+                      </p>
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -628,24 +648,58 @@ const Payment = ({ order, onConfirm, onBack }: { order: Order; onConfirm: () => 
               exit={{ opacity: 0, x: -20 }}
               className="space-y-6"
             >
-              <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm text-center space-y-6">
-                <div className="w-20 h-20 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mx-auto">
-                  <FileText className="w-10 h-10" />
-                </div>
-                <div className="space-y-2">
-                  <h2 className="text-2xl font-black text-gray-900">Facturation Différée</h2>
-                  <p className="text-sm text-gray-500 leading-relaxed">
-                    Conformément à nos conditions B2B, le paiement de cette commande sera effectué après réception de la facture mensuelle.
-                  </p>
-                </div>
-                
-                <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100 flex items-center gap-3 text-left">
-                  <div className="p-2 bg-white rounded-lg shadow-sm">
-                    <Clock className="w-5 h-5 text-blue-600" />
+              <div className="space-y-4">
+                <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
+                  <h2 className="text-xs font-bold text-gray-400 uppercase mb-3">Méthode de paiement</h2>
+                  <div className="space-y-2">
+                    {paymentMethods.map((method) => {
+                      const Icon = method.icon;
+                      const isSelected = selectedMethod === method.id;
+                      return (
+                        <button
+                          key={method.id}
+                          onClick={() => setSelectedMethod(method.id)}
+                          className={`w-full p-4 rounded-2xl border transition-all flex items-center justify-between ${isSelected ? 'bg-blue-50 border-blue-200' : 'bg-white border-gray-100'}`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className={`p-2 rounded-xl ${method.bg} ${method.color}`}>
+                              <Icon className="w-5 h-5" />
+                            </div>
+                            <span className={`text-sm font-bold ${isSelected ? 'text-blue-900' : 'text-gray-700'}`}>{method.label}</span>
+                          </div>
+                          <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${isSelected ? 'bg-blue-600 border-blue-600' : 'border-gray-200'}`}>
+                            {isSelected && <Check className="w-3 h-3 text-white" />}
+                          </div>
+                        </button>
+                      );
+                    })}
                   </div>
-                  <div>
-                    <p className="text-xs font-bold text-gray-900">Délai de paiement</p>
-                    <p className="text-[10px] text-gray-500">30 jours fin de mois</p>
+                </div>
+
+                <div className="bg-blue-600 p-6 rounded-2xl text-white shadow-xl shadow-blue-100">
+                  <div className="flex justify-between items-center">
+                    <p className="text-xs font-bold opacity-60 uppercase tracking-widest">Total à régler</p>
+                    <p className="text-2xl font-black">{order.patientAmount.toFixed(2)} MAD</p>
+                  </div>
+                </div>
+
+                <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm text-center space-y-4">
+                  <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mx-auto">
+                    <Truck className="w-8 h-8" />
+                  </div>
+                  <div className="space-y-1">
+                    <h2 className="text-xl font-black text-gray-900">
+                      {selectedMethod === 'cash' ? 'Paiement en Espèces' : 
+                       selectedMethod === 'card' ? 'Paiement par TPE' : 
+                       selectedMethod === 'check' ? 'Paiement par Chèque' : 
+                       'Paiement Mobile'}
+                    </h2>
+                    <p className="text-xs text-gray-500 leading-relaxed">
+                      {selectedMethod === 'cash' ? 'Préparez le montant exact pour faciliter la remise.' : 
+                       selectedMethod === 'card' ? 'Le livreur disposera d\'un terminal de paiement mobile.' : 
+                       selectedMethod === 'check' ? 'Chèque à l\'ordre de MediRush.' : 
+                       'Validez la transaction sur votre téléphone lors de la livraison.'}
+                    </p>
                   </div>
                 </div>
               </div>
@@ -959,6 +1013,14 @@ export default function App() {
     if (order.deliverySlot) {
       doc.text(`Créneau: ${order.deliverySlot}`, 14, 62);
     }
+    if (order.paymentMethod) {
+      const methodLabel = order.paymentMethod === 'cash' ? 'Espèces' : 
+                          order.paymentMethod === 'card' ? 'TPE Mobile' : 
+                          order.paymentMethod === 'apple' ? 'Apple Pay' : 
+                          order.paymentMethod === 'google' ? 'Google Pay' : 
+                          order.paymentMethod === 'check' ? 'Chèque' : order.paymentMethod;
+      doc.text(`Mode de paiement: ${methodLabel}`, 14, order.deliverySlot ? 67 : 62);
+    }
     
     // Table
     const tableData = order.items.map(item => {
@@ -974,7 +1036,7 @@ export default function App() {
     });
     
     autoTable(doc, {
-      startY: 70,
+      startY: 80,
       head: [['Produit', 'Qté', 'Prix Unitaire', 'Total']],
       body: tableData,
       theme: 'striped',
@@ -1671,6 +1733,18 @@ export default function App() {
                       <div>
                         <p className="text-xs font-bold text-blue-600 uppercase">Facture #{order.id}</p>
                         <p className="text-[10px] text-gray-400">{order.date} • {order.deliveryType === 'express' ? 'Express' : order.deliveryType === 'night' ? 'Nuit' : `Programmé (${order.deliverySlot})`}</p>
+                        {order.paymentMethod && (
+                          <div className="flex items-center gap-1 mt-1">
+                            <Wallet className="w-3 h-3 text-gray-400" />
+                            <span className="text-[10px] font-bold text-gray-500 uppercase">
+                              {order.paymentMethod === 'cash' ? 'Espèces' : 
+                               order.paymentMethod === 'card' ? 'TPE Mobile' : 
+                               order.paymentMethod === 'apple' ? 'Apple Pay' : 
+                               order.paymentMethod === 'google' ? 'Google Pay' : 
+                               order.paymentMethod === 'check' ? 'Chèque' : order.paymentMethod}
+                            </span>
+                          </div>
+                        )}
                       </div>
                       <div className="flex items-center gap-2">
                         <button 
@@ -1744,7 +1818,18 @@ export default function App() {
         {view === 'payment' && activeOrder && (
           <Payment 
             order={activeOrder} 
-            onConfirm={() => setView('tracking')} 
+            onConfirm={async (method) => {
+              if (!user || !activeOrder) return;
+              try {
+                await updateDoc(doc(db, 'users', user.uid, 'orders', activeOrder.id), {
+                  paymentMethod: method
+                });
+                setActiveOrder({ ...activeOrder, paymentMethod: method });
+                setView('tracking');
+              } catch (error) {
+                handleFirestoreError(error, OperationType.UPDATE, `users/${user.uid}/orders/${activeOrder.id}`);
+              }
+            }} 
             onBack={() => setView('cart')} 
           />
         )}
