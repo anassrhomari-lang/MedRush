@@ -44,7 +44,7 @@ import { CATEGORIES, PRODUCTS, SURGERY_KITS, SurgeryKit } from './constants';
 import { Product, Category, Order } from './types';
 
 import { auth, db, googleProvider, signInWithPopup, signOut, onAuthStateChanged, type User, handleFirestoreError, OperationType } from './firebase';
-import { doc, setDoc, getDoc, collection, query, where, onSnapshot, orderBy, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, getDoc, collection, query, where, onSnapshot, orderBy, serverTimestamp, updateDoc } from 'firebase/firestore';
 
 // --- Components ---
 
@@ -465,7 +465,7 @@ const ProductItem = ({ product, onAdd, onClick, generatedImage }: { product: Pro
 
 // --- Payment Component ---
 const Payment = ({ order, onConfirm, onBack }: { order: Order; onConfirm: () => void; onBack: () => void }) => {
-  const [method, setMethod] = useState<'card' | 'apple' | 'cash'>('card');
+  const [step, setStep] = useState<1 | 2 | 3>(1);
   const [isProcessing, setIsProcessing] = useState(false);
 
   const handlePay = () => {
@@ -476,6 +476,12 @@ const Payment = ({ order, onConfirm, onBack }: { order: Order; onConfirm: () => 
     }, 2000);
   };
 
+  const steps = [
+    { id: 1, label: 'Récapitulatif', icon: ClipboardList },
+    { id: 2, label: 'Livraison', icon: Truck },
+    { id: 3, label: 'Confirmation', icon: CheckCircle2 },
+  ];
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -483,106 +489,193 @@ const Payment = ({ order, onConfirm, onBack }: { order: Order; onConfirm: () => 
       exit={{ opacity: 0, y: 20 }}
       className="flex flex-col h-full bg-gray-50"
     >
-      <div className="p-4 flex items-center gap-4 bg-white border-b border-gray-100">
-        <button onClick={onBack} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
-          <ArrowLeft className="w-6 h-6 text-gray-700" />
-        </button>
-        <h1 className="text-xl font-black text-gray-900">Paiement Sécurisé</h1>
-      </div>
-
-      <div className="flex-1 overflow-y-auto p-4 space-y-6">
-        {/* Order Summary */}
-        <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
-          <h2 className="text-xs font-bold text-gray-400 uppercase mb-3">Résumé de la commande</h2>
-          <div className="space-y-2">
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-500">Total Articles</span>
-              <span className="font-bold text-gray-900">{order.totalPrice.toFixed(2)} MAD</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-500">Prise en charge (AMO/CNOPS)</span>
-              <span className="font-bold text-green-600">-{order.reimbursedAmount.toFixed(2)} MAD</span>
-            </div>
-            <div className="pt-2 border-t border-dashed border-gray-100 flex justify-between items-center">
-              <span className="font-bold text-gray-900">À payer</span>
-              <span className="text-xl font-black text-blue-600">{order.patientAmount.toFixed(2)} MAD</span>
-            </div>
-          </div>
+      <div className="p-4 bg-white border-b border-gray-100">
+        <div className="flex items-center gap-4 mb-6">
+          <button onClick={step === 1 ? onBack : () => setStep((step - 1) as any)} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
+            <ArrowLeft className="w-6 h-6 text-gray-700" />
+          </button>
+          <h1 className="text-xl font-black text-gray-900">Finalisation</h1>
         </div>
 
-        {/* Payment Methods */}
-        <div className="space-y-3">
-          <h2 className="text-xs font-bold text-gray-400 uppercase px-1">Méthode de paiement</h2>
-          
-          <button 
-            onClick={() => setMethod('card')}
-            className={`w-full p-4 rounded-2xl border-2 transition-all flex items-center gap-4 ${method === 'card' ? 'border-blue-600 bg-blue-50' : 'border-white bg-white'}`}
-          >
-            <div className={`p-2 rounded-xl ${method === 'card' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-400'}`}>
-              <CreditCard className="w-6 h-6" />
-            </div>
-            <div className="text-left">
-              <p className="font-bold text-gray-900">Carte Bancaire</p>
-              <p className="text-xs text-gray-500">Visa, Mastercard, CMI</p>
-            </div>
-            {method === 'card' && <CheckCircle2 className="w-5 h-5 text-blue-600 ml-auto" />}
-          </button>
-
-          <button 
-            onClick={() => setMethod('apple')}
-            className={`w-full p-4 rounded-2xl border-2 transition-all flex items-center gap-4 ${method === 'apple' ? 'border-blue-600 bg-blue-50' : 'border-white bg-white'}`}
-          >
-            <div className={`p-2 rounded-xl ${method === 'apple' ? 'bg-black text-white' : 'bg-gray-100 text-gray-400'}`}>
-              <Wallet className="w-6 h-6" />
-            </div>
-            <div className="text-left">
-              <p className="font-bold text-gray-900">Apple Pay / Google Pay</p>
-              <p className="text-xs text-gray-500">Paiement en un clic</p>
-            </div>
-            {method === 'apple' && <CheckCircle2 className="w-5 h-5 text-blue-600 ml-auto" />}
-          </button>
-
-          <button 
-            onClick={() => setMethod('cash')}
-            className={`w-full p-4 rounded-2xl border-2 transition-all flex items-center gap-4 ${method === 'cash' ? 'border-blue-600 bg-blue-50' : 'border-white bg-white'}`}
-          >
-            <div className={`p-2 rounded-xl ${method === 'cash' ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-400'}`}>
-              <Truck className="w-6 h-6" />
-            </div>
-            <div className="text-left">
-              <p className="font-bold text-gray-900">Paiement à la livraison</p>
-              <p className="text-xs text-gray-500">Espèces ou TPE mobile</p>
-            </div>
-            {method === 'cash' && <CheckCircle2 className="w-5 h-5 text-blue-600 ml-auto" />}
-          </button>
-        </div>
-
-        {/* Security Badge */}
-        <div className="flex items-center justify-center gap-2 text-gray-400">
-          <ShieldCheck className="w-4 h-4" />
-          <span className="text-[10px] font-medium uppercase tracking-wider">Transaction 100% sécurisée par CMI</span>
+        {/* Progress Bar */}
+        <div className="flex justify-between relative px-2">
+          <div className="absolute top-1/2 left-0 right-0 h-0.5 bg-gray-100 -translate-y-1/2 z-0" />
+          {steps.map((s) => {
+            const Icon = s.icon;
+            const isActive = step >= s.id;
+            const isCurrent = step === s.id;
+            return (
+              <div key={s.id} className="relative z-10 flex flex-col items-center gap-2">
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${isActive ? 'bg-blue-600 text-white shadow-lg shadow-blue-200' : 'bg-white text-gray-300 border border-gray-100'}`}>
+                  <Icon className="w-4 h-4" />
+                </div>
+                <span className={`text-[8px] font-bold uppercase tracking-wider ${isCurrent ? 'text-blue-600' : 'text-gray-400'}`}>{s.label}</span>
+              </div>
+            );
+          })}
         </div>
       </div>
 
-      <div className="p-4 bg-white border-t border-gray-100">
-        <motion.button
-          whileTap={{ scale: 0.98 }}
-          onClick={handlePay}
-          disabled={isProcessing}
-          className="w-full bg-blue-600 text-white py-4 rounded-2xl font-bold text-lg shadow-xl shadow-blue-200 flex items-center justify-center gap-3 disabled:bg-blue-300"
-        >
-          {isProcessing ? (
-            <>
-              <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-              TRAITEMENT...
-            </>
-          ) : (
-            <>
-              PAYER {order.patientAmount.toFixed(2)} MAD
-              <ChevronRight className="w-5 h-5" />
-            </>
+      <div className="flex-1 overflow-y-auto p-4">
+        <AnimatePresence mode="wait">
+          {step === 1 && (
+            <motion.div
+              key="step1"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              className="space-y-6"
+            >
+              <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
+                <h2 className="text-xs font-bold text-gray-400 uppercase mb-3">Résumé de la commande</h2>
+                <div className="space-y-3">
+                  {order.items.map((item: any, idx: number) => (
+                    <div key={idx} className="flex justify-between items-center text-sm">
+                      <div className="flex items-center gap-2">
+                        <span className="w-5 h-5 bg-gray-100 rounded flex items-center justify-center text-[10px] font-bold text-gray-500">{item.quantity}x</span>
+                        <span className="text-gray-700 font-medium truncate max-w-[150px]">{item.product?.name || item.name}</span>
+                      </div>
+                      <span className="font-bold text-gray-900">{(item.price * item.quantity).toFixed(2)} MAD</span>
+                    </div>
+                  ))}
+                  <div className="pt-3 border-t border-gray-50 space-y-2">
+                    <div className="flex justify-between text-xs">
+                      <span className="text-gray-500">Total Articles</span>
+                      <span className="font-bold text-gray-900">{order.totalPrice.toFixed(2)} MAD</span>
+                    </div>
+                    <div className="flex justify-between text-xs">
+                      <span className="text-gray-500">Prise en charge</span>
+                      <span className="font-bold text-green-600">-{order.reimbursedAmount.toFixed(2)} MAD</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-blue-600 p-6 rounded-2xl text-white shadow-xl shadow-blue-100">
+                <p className="text-xs font-bold opacity-60 uppercase tracking-widest mb-1">Total à payer</p>
+                <p className="text-3xl font-black">{order.patientAmount.toFixed(2)} MAD</p>
+              </div>
+
+              <button 
+                onClick={() => setStep(2)}
+                className="w-full bg-blue-600 text-white py-4 rounded-2xl font-bold text-lg shadow-xl shadow-blue-200 flex items-center justify-center gap-3"
+              >
+                CONTINUER VERS LA LIVRAISON
+                <ArrowLeft className="w-5 h-5 rotate-180" />
+              </button>
+            </motion.div>
           )}
-        </motion.button>
+
+          {step === 2 && (
+            <motion.div
+              key="step2"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              className="space-y-6"
+            >
+              <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm space-y-4">
+                <h2 className="text-xs font-bold text-gray-400 uppercase mb-1">Informations de Livraison</h2>
+                <div className="space-y-4">
+                  <div className="flex items-start gap-3 p-3 bg-gray-50 rounded-xl border border-gray-100">
+                    <MapPin className="w-5 h-5 text-blue-600 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-bold text-gray-900">Adresse par défaut</p>
+                      <p className="text-xs text-gray-500">123 Rue de la Santé, Casablanca, Maroc</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3 p-3 bg-gray-50 rounded-xl border border-gray-100">
+                    <Clock className="w-5 h-5 text-orange-600 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-bold text-gray-900">Mode de livraison</p>
+                      <p className="text-xs text-gray-500">
+                        {order.deliveryType === 'express' ? 'Express (45 min)' : order.deliveryType === 'night' ? 'Nuit' : `Programmé (${order.deliverySlot})`}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
+                <h2 className="text-xs font-bold text-gray-400 uppercase mb-3">Détails du destinataire</h2>
+                <div className="space-y-3">
+                  <div>
+                    <label className="text-[10px] font-bold text-gray-400 uppercase">Nom Complet</label>
+                    <p className="text-sm font-bold text-gray-900">Dr. Anass Rhomari</p>
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-gray-400 uppercase">Téléphone</label>
+                    <p className="text-sm font-bold text-gray-900">+212 6 00 00 00 00</p>
+                  </div>
+                </div>
+              </div>
+
+              <button 
+                onClick={() => setStep(3)}
+                className="w-full bg-blue-600 text-white py-4 rounded-2xl font-bold text-lg shadow-xl shadow-blue-200 flex items-center justify-center gap-3"
+              >
+                CONFIRMER LA COMMANDE
+                <ArrowLeft className="w-5 h-5 rotate-180" />
+              </button>
+            </motion.div>
+          )}
+
+          {step === 3 && (
+            <motion.div
+              key="step3"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              className="space-y-6"
+            >
+              <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm text-center space-y-6">
+                <div className="w-20 h-20 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mx-auto">
+                  <FileText className="w-10 h-10" />
+                </div>
+                <div className="space-y-2">
+                  <h2 className="text-2xl font-black text-gray-900">Facturation Différée</h2>
+                  <p className="text-sm text-gray-500 leading-relaxed">
+                    Conformément à nos conditions B2B, le paiement de cette commande sera effectué après réception de la facture mensuelle.
+                  </p>
+                </div>
+                
+                <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100 flex items-center gap-3 text-left">
+                  <div className="p-2 bg-white rounded-lg shadow-sm">
+                    <Clock className="w-5 h-5 text-blue-600" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-gray-900">Délai de paiement</p>
+                    <p className="text-[10px] text-gray-500">30 jours fin de mois</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-center gap-2 text-gray-400">
+                <ShieldCheck className="w-4 h-4" />
+                <span className="text-[10px] font-medium uppercase tracking-wider">Commande enregistrée sur votre compte professionnel</span>
+              </div>
+
+              <motion.button
+                whileTap={{ scale: 0.98 }}
+                onClick={handlePay}
+                disabled={isProcessing}
+                className="w-full bg-blue-600 text-white py-4 rounded-2xl font-bold text-lg shadow-xl shadow-blue-200 flex items-center justify-center gap-3 disabled:bg-blue-300"
+              >
+                {isProcessing ? (
+                  <>
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    ENREGISTREMENT...
+                  </>
+                ) : (
+                  <>
+                    VALIDER LA COMMANDE
+                    <CheckCircle2 className="w-5 h-5" />
+                  </>
+                )}
+              </motion.button>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </motion.div>
   );
@@ -770,7 +863,21 @@ export default function App() {
   const cartTotal = cart.reduce((acc, item) => acc + item.product.price * item.quantity, 0);
   const cartReimbursed = cart.reduce((acc, item) => acc + (item.product.isReimbursed ? item.product.price * item.quantity : 0), 0);
   const cartPatient = cartTotal - cartReimbursed;
+  
   const pastOrdersTotal = pastOrders.reduce((acc, order) => acc + (order.totalPrice || 0), 0);
+  const pastOrdersPaidTotal = pastOrders.filter(o => o.paymentStatus === 'paid').reduce((acc, order) => acc + (order.totalPrice || 0), 0);
+  const pastOrdersUnpaidTotal = pastOrders.filter(o => o.paymentStatus === 'unpaid').reduce((acc, order) => acc + (order.totalPrice || 0), 0);
+
+  const updateOrderPaymentStatus = async (orderId: string, newStatus: 'paid' | 'unpaid') => {
+    if (!user) return;
+    try {
+      await updateDoc(doc(db, 'users', user.uid, 'orders', orderId), {
+        paymentStatus: newStatus
+      });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `users/${user.uid}/orders/${orderId}`);
+    }
+  };
 
   const handleLogin = async () => {
     try {
@@ -797,6 +904,7 @@ export default function App() {
       id: orderId,
       uid: user.uid,
       status: 'received',
+      paymentStatus: 'unpaid',
       eta: deliveryType === 'express' ? 45 : 0,
       items: cart.map(item => ({
         productId: item.product.id,
@@ -1330,7 +1438,18 @@ export default function App() {
             <Header title="Suivi Livraison" onBack={() => setView('home')} onProfile={() => setView('profile')} user={user} />
             <div className="relative h-[40vh] bg-gray-200">
               {/* Simulated Map */}
-              <div className="absolute inset-0 bg-[url('https://picsum.photos/seed/map/800/800')] bg-cover opacity-50 grayscale" />
+              <div className="absolute inset-0 grayscale opacity-40">
+                <iframe 
+                  width="100%" 
+                  height="100%" 
+                  frameBorder="0" 
+                  scrolling="no" 
+                  marginHeight={0} 
+                  marginWidth={0} 
+                  src="https://maps.google.com/maps?width=100%25&height=600&hl=en&q=Casablanca,Morocco&t=&z=14&ie=UTF8&iwloc=B&output=embed"
+                  title="Livraison Map"
+                />
+              </div>
               <div className="absolute inset-0 flex items-center justify-center">
                 <div className="relative">
                   <motion.div 
@@ -1449,21 +1568,21 @@ export default function App() {
                 <div className="grid grid-cols-2 gap-3">
                   <div className="bg-blue-600 p-4 rounded-2xl shadow-lg shadow-blue-100 col-span-2">
                     <p className="text-[10px] font-bold text-blue-100 uppercase mb-1">Chiffre d'Affaires Total</p>
-                    <p className="text-2xl font-black text-white">15,570 MAD</p>
+                    <p className="text-2xl font-black text-white">{pastOrdersTotal.toFixed(2)} MAD</p>
                     <p className="text-[10px] text-blue-200 mt-1 font-medium">Cumul des dossiers Caisse & Patient</p>
                   </div>
                   <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
-                    <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Remboursé (Caisse)</p>
-                    <p className="text-xl font-black text-blue-600">12,450 MAD</p>
+                    <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Total Payé</p>
+                    <p className="text-xl font-black text-blue-600">{pastOrdersPaidTotal.toFixed(2)} MAD</p>
                     <div className="flex items-center gap-1 mt-2 text-[10px] text-green-500 font-bold">
-                      <TrendingUp className="w-3 h-3" /> +12% ce mois
+                      <CheckCircle2 className="w-3 h-3" /> Règlement validé
                     </div>
                   </div>
                   <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
-                    <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Extra (Patient)</p>
-                    <p className="text-xl font-black text-gray-800">3,120 MAD</p>
-                    <div className="flex items-center gap-1 mt-2 text-[10px] text-gray-400 font-bold">
-                      Stable
+                    <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Total En Attente</p>
+                    <p className="text-xl font-black text-orange-600">{pastOrdersUnpaidTotal.toFixed(2)} MAD</p>
+                    <div className="flex items-center gap-1 mt-2 text-[10px] text-orange-500 font-bold">
+                      <Clock className="w-3 h-3" /> Facturation différée
                     </div>
                   </div>
                 </div>
@@ -1539,7 +1658,7 @@ export default function App() {
           >
             <Header title="Mes Factures" onBack={() => setView('home')} onProfile={() => setView('profile')} user={user} />
             
-            <div className="flex-1 px-4 py-6 overflow-y-auto space-y-4">
+            <div className="flex-1 px-4 pt-6 pb-52 overflow-y-auto space-y-4">
               {pastOrders.length === 0 ? (
                 <div className="h-full flex flex-col items-center justify-center text-center space-y-4 opacity-50">
                   <FileText className="w-16 h-16 text-gray-300" />
@@ -1553,7 +1672,18 @@ export default function App() {
                         <p className="text-xs font-bold text-blue-600 uppercase">Facture #{order.id}</p>
                         <p className="text-[10px] text-gray-400">{order.date} • {order.deliveryType === 'express' ? 'Express' : order.deliveryType === 'night' ? 'Nuit' : `Programmé (${order.deliverySlot})`}</p>
                       </div>
-                      <span className="bg-green-100 text-green-600 text-[10px] font-bold px-2 py-1 rounded-full uppercase">Payée</span>
+                      <div className="flex items-center gap-2">
+                        <button 
+                          onClick={() => updateOrderPaymentStatus(order.id, order.paymentStatus === 'paid' ? 'unpaid' : 'paid')}
+                          className={`text-[10px] font-bold px-3 py-1 rounded-full uppercase transition-all ${
+                            order.paymentStatus === 'paid' 
+                              ? 'bg-green-100 text-green-600 border border-green-200' 
+                              : 'bg-orange-100 text-orange-600 border border-orange-200'
+                          }`}
+                        >
+                          {order.paymentStatus === 'paid' ? 'Payée' : 'Non Payée'}
+                        </button>
+                      </div>
                     </div>
                     
                     <div className="flex justify-between items-center pt-2 border-t border-gray-50">
@@ -1589,12 +1719,24 @@ export default function App() {
             </div>
 
             {pastOrders.length > 0 && (
-              <div className="p-6 bg-white border-t border-gray-100 space-y-2 mb-16 shadow-2xl">
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-500 font-bold text-sm uppercase tracking-wider">Total à payé :</span>
-                  <span className="text-2xl font-black text-blue-600">{pastOrdersTotal.toFixed(2)} MAD</span>
+              <div className="fixed bottom-16 left-0 right-0 p-4 bg-white border-t border-gray-100 shadow-[0_-10px_20px_rgba(0,0,0,0.05)] z-40 max-w-md mx-auto">
+                <div className="grid grid-cols-2 gap-4 mb-3">
+                  <div className="bg-green-50 p-3 rounded-2xl border border-green-100">
+                    <p className="text-[10px] font-bold text-green-600 uppercase tracking-wider mb-1">Total Payé</p>
+                    <p className="text-lg font-black text-green-700">{pastOrdersPaidTotal.toFixed(2)} MAD</p>
+                  </div>
+                  <div className="bg-orange-50 p-3 rounded-2xl border border-orange-100">
+                    <p className="text-[10px] font-bold text-orange-600 uppercase tracking-wider mb-1">Total En Attente</p>
+                    <p className="text-lg font-black text-orange-700">{pastOrdersUnpaidTotal.toFixed(2)} MAD</p>
+                  </div>
                 </div>
-                <p className="text-[10px] text-gray-400 text-center">Somme totale de toutes vos factures réglées</p>
+                <div className="pt-3 border-t border-gray-50 flex justify-between items-center">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 bg-blue-600 rounded-full animate-pulse" />
+                    <span className="text-[10px] font-bold text-gray-500 uppercase">Volume Total TTC</span>
+                  </div>
+                  <span className="text-sm font-black text-gray-900">{pastOrdersTotal.toFixed(2)} MAD</span>
+                </div>
               </div>
             )}
           </motion.div>

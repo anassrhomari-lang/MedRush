@@ -21,6 +21,7 @@ export interface Category {
 export interface Order {
   id: string;
   status: 'received' | 'preparing' | 'on_way' | 'delivered';
+  paymentStatus: 'paid' | 'unpaid';
   eta: number; // minutes
   items: { product: Product; quantity: number }[];
   totalPrice: number;
